@@ -94,13 +94,16 @@ export default function App() {
       localStorage.setItem("adminUser", res.data.username);
       setLoginCreds({ username: "", password: "" });
     } catch (err) {
-      // Safely extract string message to prevent Error #31
-      const errMsg =
-        typeof err.response?.data === "string"
-          ? err.response.data
-          : err.response?.data?.error ||
-            "Login failed. Check server connection.";
-      setLoginError(errMsg);
+      console.error("Login error object:", err);
+
+      // Safely extract string message from response
+      const message =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        (typeof err.response?.data === "string" ? err.response.data : null) ||
+        "Unable to connect to backend server (404/Network Error).";
+
+      setLoginError(message);
     }
   };
 
