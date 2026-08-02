@@ -10,7 +10,7 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Fix Leaflet marker icons
+// Leaflet marker fix
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -21,12 +21,11 @@ L.Icon.Default.mergeOptions({
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
-// Ensure base URL has no trailing slash
+// Normalize API Base URL (removes trailing slashes to avoid //issues 404s)
 const RAW_URL =
   import.meta.env.VITE_API_BASE_URL || "https://civic-pulse-gis-1.onrender.com";
 const API_BASE_URL = RAW_URL.replace(/\/+$/, "");
 
-// Map Click Listener Component
 function LocationMarker({ position, setPosition }) {
   useMapEvents({
     click(e) {
@@ -56,7 +55,7 @@ export default function App() {
   const [loginCreds, setLoginCreds] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
 
-  // Form State
+  // Form state
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -75,9 +74,12 @@ export default function App() {
       const response = await axios.get(`${API_BASE_URL}/issues`);
       if (Array.isArray(response.data)) {
         setIssues(response.data);
+      } else {
+        setIssues([]);
       }
     } catch (err) {
       console.error("Error fetching issues:", err);
+      setIssues([]); // Prevent undefined state
     }
   };
 
@@ -92,7 +94,13 @@ export default function App() {
       localStorage.setItem("adminUser", res.data.username);
       setLoginCreds({ username: "", password: "" });
     } catch (err) {
-      setLoginError(err.response?.data?.error || "Login failed");
+      // Safely extract string message to prevent Error #31
+      const errMsg =
+        typeof err.response?.data === "string"
+          ? err.response.data
+          : err.response?.data?.error ||
+            "Login failed. Check server connection.";
+      setLoginError(errMsg);
     }
   };
 
@@ -145,10 +153,11 @@ export default function App() {
       );
       fetchIssues();
     } catch (err) {
-      alert(
-        err.response?.data?.error ||
-          "Failed to update status. Please log in again.",
-      );
+      const msg =
+        typeof err.response?.data?.error === "string"
+          ? err.response.data.error
+          : "Failed to update status.";
+      alert(msg);
       if (err.response?.status === 401 || err.response?.status === 403) {
         handleLogout();
       }
@@ -169,7 +178,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {/* Navbar */}
       <header className="bg-indigo-700 text-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
           <div className="flex items-center space-x-2">
@@ -213,7 +221,7 @@ export default function App() {
             {adminToken && (
               <div className="flex items-center space-x-2 bg-indigo-900 px-3 py-1.5 rounded-lg text-xs">
                 <span>
-                  👨‍💼 Admin: <strong>{adminUser}</strong>
+                  👨‍💼 Admin: <strong>{String(adminUser)}</strong>
                 </span>
                 <button
                   onClick={handleLogout}
@@ -227,9 +235,8 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 flex flex-col gap-4">
-        {/* Metric Cards */}
+        {/* Metrics Bar */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">
             <div>
@@ -243,7 +250,7 @@ export default function App() {
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">
             <div>
               <p className="text-xs text-slate-500 font-semibold uppercase">
-                Pending Action
+                Pending
               </p>
               <p className="text-2xl font-bold text-amber-600">
                 {stats.pending}
@@ -292,13 +299,14 @@ export default function App() {
                 {filteredIssues.map((issue) => {
                   if (
                     !issue?.location?.coordinates ||
+                    !Array.isArray(issue.location.coordinates) ||
                     issue.location.coordinates.length < 2
                   ) {
                     return null;
                   }
                   return (
                     <Marker
-                      key={issue._id}
+                      key={issue._id || String(Math.random())}
                       position={[
                         issue.location.coordinates[1],
                         issue.location.coordinates[0],
@@ -314,13 +322,13 @@ export default function App() {
                             />
                           )}
                           <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">
-                            {issue.category}
+                            {String(issue.category)}
                           </span>
                           <h3 className="font-bold text-sm mt-1 text-slate-800">
-                            {issue.title}
+                            {String(issue.title)}
                           </h3>
                           <p className="text-xs text-slate-600 mt-1">
-                            {issue.description}
+                            {String(issue.description)}
                           </p>
                           <p className="text-xs mt-2 font-semibold">
                             Status:{" "}
@@ -333,7 +341,7 @@ export default function App() {
                                     : "text-amber-600"
                               }
                             >
-                              {issue.status}
+                              {String(issue.status)}
                             </span>
                           </p>
                         </div>
@@ -344,7 +352,6 @@ export default function App() {
               </MapContainer>
             </div>
 
-            {/* Sidebar Filter */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
               <h2 className="font-bold text-slate-800 mb-3">
                 Filter Incidents
@@ -383,7 +390,7 @@ export default function App() {
                 1. Click Location on Map
               </h2>
               <p className="text-xs text-slate-500 mb-3">
-                Click on the map to mark the exact location of the civic issue.
+                Click on the map to set coordinates.
               </p>
               <div className="h-[380px] w-full rounded-lg overflow-hidden border">
                 <MapContainer
@@ -409,7 +416,7 @@ export default function App() {
 
             <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
               <h2 className="font-bold text-slate-800 mb-3">
-                2. Fill Report Details
+                2. Report Details
               </h2>
               {submitStatus && (
                 <div
@@ -419,7 +426,7 @@ export default function App() {
                       : "bg-red-50 text-red-700"
                   }`}
                 >
-                  {submitStatus}
+                  {String(submitStatus)}
                 </div>
               )}
               <form onSubmit={handleFormSubmit} className="space-y-4">
@@ -497,22 +504,17 @@ export default function App() {
         {activeTab === "management" && (
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
             {!adminToken ? (
-              /* ADMIN LOGIN FORM */
               <div className="max-w-md mx-auto py-8">
                 <div className="text-center mb-6">
                   <span className="text-4xl">🔒</span>
                   <h2 className="text-xl font-bold text-slate-800 mt-2">
-                    Municipal Admin Portal
+                    Admin Portal
                   </h2>
-                  <p className="text-xs text-slate-500">
-                    Log in to manage civic reports and update resolution
-                    statuses.
-                  </p>
                 </div>
 
                 {loginError && (
                   <div className="bg-red-50 text-red-700 p-3 rounded-lg text-xs font-medium mb-4 text-center">
-                    {loginError}
+                    {String(loginError)}
                   </div>
                 )}
 
@@ -562,24 +564,13 @@ export default function App() {
                   >
                     Log In as Admin
                   </button>
-                  <p className="text-xs text-slate-400 text-center mt-2">
-                    Default Credentials — User: <strong>admin</strong> | Pass:{" "}
-                    <strong>admin123</strong>
-                  </p>
                 </form>
               </div>
             ) : (
-              /* ADMIN MANAGEMENT DESK */
               <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="font-bold text-slate-800 text-lg">
-                    Admin Management Desk
-                  </h2>
-                  <span className="text-xs text-emerald-600 font-semibold bg-emerald-50 px-3 py-1 rounded-full">
-                    Authenticated Admin Session Active
-                  </span>
-                </div>
-
+                <h2 className="font-bold text-slate-800 text-lg mb-4">
+                  Admin Management Desk
+                </h2>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
@@ -594,20 +585,17 @@ export default function App() {
                     </thead>
                     <tbody className="divide-y text-sm">
                       {issues.map((issue) => (
-                        <tr key={issue._id} className="hover:bg-slate-50">
+                        <tr
+                          key={issue._id || String(Math.random())}
+                          className="hover:bg-slate-50"
+                        >
                           <td className="p-3">
                             {issue.imageUrl ? (
-                              <a
-                                href={issue.imageUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                <img
-                                  src={issue.imageUrl}
-                                  alt={issue.title}
-                                  className="w-10 h-10 object-cover rounded-lg hover:scale-110 transition-transform border"
-                                />
-                              </a>
+                              <img
+                                src={issue.imageUrl}
+                                alt={issue.title}
+                                className="w-10 h-10 object-cover rounded-lg border"
+                              />
                             ) : (
                               <span className="text-xs text-slate-400 italic">
                                 No photo
@@ -616,21 +604,23 @@ export default function App() {
                           </td>
                           <td className="p-3">
                             <span className="text-xs px-2 py-1 rounded bg-slate-100 font-semibold text-slate-700">
-                              {issue.category}
+                              {String(issue.category)}
                             </span>
                           </td>
                           <td className="p-3 font-semibold text-slate-800">
-                            {issue.title}
+                            {String(issue.title)}
                           </td>
                           <td className="p-3 text-slate-600 max-w-xs truncate">
-                            {issue.description}
+                            {String(issue.description)}
                           </td>
                           <td className="p-3 text-xs text-slate-400">
-                            {new Date(issue.createdAt).toLocaleDateString()}
+                            {issue.createdAt
+                              ? new Date(issue.createdAt).toLocaleDateString()
+                              : "N/A"}
                           </td>
                           <td className="p-3">
                             <select
-                              value={issue.status}
+                              value={issue.status || "Pending"}
                               onChange={(e) =>
                                 handleStatusChange(issue._id, e.target.value)
                               }
