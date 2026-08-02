@@ -94,19 +94,23 @@ export default function App() {
       localStorage.setItem("adminUser", res.data.username);
       setLoginCreds({ username: "", password: "" });
     } catch (err) {
-      console.error("Login error object:", err);
+      console.error("Login Error:", err);
 
-      // Safely extract string message from response
-      const message =
-        err.response?.data?.error ||
-        err.response?.data?.message ||
-        (typeof err.response?.data === "string" ? err.response.data : null) ||
-        "Unable to connect to backend server (404/Network Error).";
+      // Always extract a string message to avoid [object Object]
+      let message = "Failed to log in.";
+      if (typeof err.response?.data?.error === "string") {
+        message = err.response.data.error;
+      } else if (typeof err.response?.data?.message === "string") {
+        message = err.response.data.message;
+      } else if (typeof err.response?.data === "string") {
+        message = err.response.data;
+      } else if (err.message) {
+        message = err.message;
+      }
 
       setLoginError(message);
     }
   };
-
   const handleLogout = () => {
     setAdminToken("");
     setAdminUser("");
