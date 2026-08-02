@@ -8,6 +8,7 @@ import {
   useMapEvents,
 } from "react-leaflet";
 import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 // Fix Leaflet marker icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -20,8 +21,10 @@ L.Icon.Default.mergeOptions({
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
-const API_BASE_URL =
+// Ensure base URL has no trailing slash
+const RAW_URL =
   import.meta.env.VITE_API_BASE_URL || "https://civic-pulse-gis-1.onrender.com";
+const API_BASE_URL = RAW_URL.replace(/\/+$/, "");
 
 // Map Click Listener Component
 function LocationMarker({ position, setPosition }) {
@@ -70,7 +73,9 @@ export default function App() {
   const fetchIssues = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/issues`);
-      setIssues(response.data);
+      if (Array.isArray(response.data)) {
+        setIssues(response.data);
+      }
     } catch (err) {
       console.error("Error fetching issues:", err);
     }
@@ -175,19 +180,31 @@ export default function App() {
             <nav className="flex space-x-1 bg-indigo-800 p-1 rounded-lg">
               <button
                 onClick={() => setActiveTab("explore")}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === "explore" ? "bg-white text-indigo-700 shadow" : "text-indigo-100 hover:bg-indigo-600"}`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                  activeTab === "explore"
+                    ? "bg-white text-indigo-700 shadow"
+                    : "text-indigo-100 hover:bg-indigo-600"
+                }`}
               >
                 Explore Map
               </button>
               <button
                 onClick={() => setActiveTab("report")}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === "report" ? "bg-white text-indigo-700 shadow" : "text-indigo-100 hover:bg-indigo-600"}`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                  activeTab === "report"
+                    ? "bg-white text-indigo-700 shadow"
+                    : "text-indigo-100 hover:bg-indigo-600"
+                }`}
               >
                 Report Issue
               </button>
               <button
                 onClick={() => setActiveTab("management")}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition ${activeTab === "management" ? "bg-white text-indigo-700 shadow" : "text-indigo-100 hover:bg-indigo-600"}`}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition ${
+                  activeTab === "management"
+                    ? "bg-white text-indigo-700 shadow"
+                    : "text-indigo-100 hover:bg-indigo-600"
+                }`}
               >
                 Management
               </button>
@@ -263,6 +280,7 @@ export default function App() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 flex-1">
             <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-100 p-2 h-[500px]">
               <MapContainer
+                key="explore-map"
                 center={[18.5204, 73.8567]}
                 zoom={12}
                 className="h-full w-full rounded-lg"
@@ -271,50 +289,58 @@ export default function App() {
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
-                {filteredIssues.map((issue) => (
-                  <Marker
-                    key={issue._id}
-                    position={[
-                      issue.location.coordinates[1],
-                      issue.location.coordinates[0],
-                    ]}
-                  >
-                    <Popup>
-                      <div className="p-1 max-w-[200px]">
-                        {issue.imageUrl && (
-                          <img
-                            src={issue.imageUrl}
-                            alt={issue.title}
-                            className="w-full h-28 object-cover rounded-lg mb-2 border border-slate-200"
-                          />
-                        )}
-                        <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">
-                          {issue.category}
-                        </span>
-                        <h3 className="font-bold text-sm mt-1 text-slate-800">
-                          {issue.title}
-                        </h3>
-                        <p className="text-xs text-slate-600 mt-1">
-                          {issue.description}
-                        </p>
-                        <p className="text-xs mt-2 font-semibold">
-                          Status:{" "}
-                          <span
-                            className={
-                              issue.status === "Resolved"
-                                ? "text-emerald-600"
-                                : issue.status === "In Progress"
-                                  ? "text-blue-600"
-                                  : "text-amber-600"
-                            }
-                          >
-                            {issue.status}
+                {filteredIssues.map((issue) => {
+                  if (
+                    !issue?.location?.coordinates ||
+                    issue.location.coordinates.length < 2
+                  ) {
+                    return null;
+                  }
+                  return (
+                    <Marker
+                      key={issue._id}
+                      position={[
+                        issue.location.coordinates[1],
+                        issue.location.coordinates[0],
+                      ]}
+                    >
+                      <Popup>
+                        <div className="p-1 max-w-[200px]">
+                          {issue.imageUrl && (
+                            <img
+                              src={issue.imageUrl}
+                              alt={issue.title}
+                              className="w-full h-28 object-cover rounded-lg mb-2 border border-slate-200"
+                            />
+                          )}
+                          <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">
+                            {issue.category}
                           </span>
-                        </p>
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
+                          <h3 className="font-bold text-sm mt-1 text-slate-800">
+                            {issue.title}
+                          </h3>
+                          <p className="text-xs text-slate-600 mt-1">
+                            {issue.description}
+                          </p>
+                          <p className="text-xs mt-2 font-semibold">
+                            Status:{" "}
+                            <span
+                              className={
+                                issue.status === "Resolved"
+                                  ? "text-emerald-600"
+                                  : issue.status === "In Progress"
+                                    ? "text-blue-600"
+                                    : "text-amber-600"
+                              }
+                            >
+                              {issue.status}
+                            </span>
+                          </p>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
               </MapContainer>
             </div>
 
@@ -361,6 +387,7 @@ export default function App() {
               </p>
               <div className="h-[380px] w-full rounded-lg overflow-hidden border">
                 <MapContainer
+                  key="report-map"
                   center={[18.5204, 73.8567]}
                   zoom={12}
                   className="h-full w-full"
@@ -386,7 +413,11 @@ export default function App() {
               </h2>
               {submitStatus && (
                 <div
-                  className={`p-3 rounded-lg text-sm mb-3 ${submitStatus.includes("successfully") ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}
+                  className={`p-3 rounded-lg text-sm mb-3 ${
+                    submitStatus.includes("successfully")
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-red-50 text-red-700"
+                  }`}
                 >
                   {submitStatus}
                 </div>
