@@ -69,7 +69,7 @@ export default function App() {
 
   const fetchIssues = async () => {
     try {
-      const response = await axios.get(`${API_BASE}/issues`);
+      const response = await axios.get(`${API_BASE_URL}/issues`);
       setIssues(response.data);
     } catch (err) {
       console.error("Error fetching issues:", err);
@@ -80,7 +80,7 @@ export default function App() {
     e.preventDefault();
     setLoginError("");
     try {
-      const res = await axios.post(`${API_BASE}/admin/login`, loginCreds);
+      const res = await axios.post(`${API_BASE_URL}/admin/login`, loginCreds);
       setAdminToken(res.data.token);
       setAdminUser(res.data.username);
       localStorage.setItem("adminToken", res.data.token);
@@ -116,7 +116,7 @@ export default function App() {
         formDataToSend.append("image", file);
       }
 
-      await axios.post(`${API_BASE}/issues`, formDataToSend, {
+      await axios.post(`${API_BASE_URL}/issues`, formDataToSend, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
@@ -134,7 +134,7 @@ export default function App() {
   const handleStatusChange = async (id, newStatus) => {
     try {
       await axios.patch(
-        `${API_BASE}/issues/${id}`,
+        `${API_BASE_URL}/issues/${id}`,
         { status: newStatus },
         { headers: { Authorization: `Bearer ${adminToken}` } },
       );
