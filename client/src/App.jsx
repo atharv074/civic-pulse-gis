@@ -20,7 +20,8 @@ L.Icon.Default.mergeOptions({
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
-const API_BASE = "https://civic-pulse-gis.onrender.com/api";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "https://civic-pulse-gis-1.onrender.com";
 
 // Map Click Listener Component
 function LocationMarker({ position, setPosition }) {
