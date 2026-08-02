@@ -1,7 +1,19 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 
+// 1. CREATE THE APP FIRST
+const app = express();
+
+const PORT = process.env.PORT || 5000;
+const JWT_SECRET = process.env.JWT_SECRET || "civic_pulse_secret_key_123";
+
+// 2. NOW USE MIDDLEWARE ON APP
 app.use(
   cors({
     origin: [
@@ -13,25 +25,13 @@ app.use(
     credentials: true,
   }),
 );
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
-
-const app = express();
-const PORT = process.env.PORT || 5000;
-const JWT_SECRET = process.env.JWT_SECRET || "civic_pulse_secret_key_123";
+app.use(express.json());
 
 // Ensure uploads folder exists
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
-
-// Middleware
-app.use(cors());
-app.use(express.json());
 
 // Serve uploaded images publicly
 app.use("/uploads", express.static(uploadsDir));
@@ -48,36 +48,17 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// MongoDB Connection
+// MongoDB Connection (Fallback to local only if MONGO_URI is missing)
 const MONGO_URI =
   process.env.MONGO_URI || "mongodb://127.0.0.1:27017/civic_reporting";
 
-mongoose
-  .connect(MONGO_URI)
-  .then(async () => {
-    console.log("✅ Connected to MongoDB successfully");
-    // Seed default Admin if none exists
-    const existingAdmin = await Admin.findOne({ username: "admin" });
-    if (!existingAdmin) {
-      const hashedPassword = await bcrypt.hash("admin123", 10);
-      await Admin.create({ username: "admin", password: hashedPassword });
-      console.log(
-        "🔑 Default Admin created: Username: admin | Password: admin123",
-      );
-    }
-  })
-  .catch((err) => console.error("❌ MongoDB Connection Error:", err));
-
 // SCHEMAS & MODELS
-
-// Admin Schema
 const adminSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
 });
 const Admin = mongoose.model("Admin", adminSchema);
 
-// Issue Schema
 const issueSchema = new mongoose.Schema({
   title: { type: String, required: true },
   description: { type: String, required: true },
@@ -102,7 +83,23 @@ const issueSchema = new mongoose.Schema({
 issueSchema.index({ location: "2dsphere" });
 const Issue = mongoose.model("Issue", issueSchema);
 
-// AUTH MIDDLEWARE (Protects Admin Routes)
+// Connect MongoDB and Seed Admin
+mongoose
+  .connect(MONGO_URI)
+  .then(async () => {
+    console.log("✅ Connected to MongoDB successfully");
+    const existingAdmin = await Admin.findOne({ username: "admin" });
+    if (!existingAdmin) {
+      const hashedPassword = await bcrypt.hash("admin123", 10);
+      await Admin.create({ username: "admin", password: hashedPassword });
+      console.log(
+        "🔑 Default Admin created: Username: admin | Password: admin123",
+      );
+    }
+  })
+  .catch((err) => console.error("❌ MongoDB Connection Error:", err));
+
+// AUTH MIDDLEWARE
 const verifyAdminToken = (req, res, next) => {
   const tokenHeader = req.headers["authorization"];
   if (!tokenHeader) {
@@ -126,12 +123,10 @@ const verifyAdminToken = (req, res, next) => {
 
 // --- API ROUTES ---
 
-// Public Root Route
 app.get("/", (req, res) => {
   res.send("Civic Issue API Server Running");
 });
 
-// PUBLIC: GET all issues (Citizens & Admins can view)
 app.get("/api/issues", async (req, res) => {
   try {
     const issues = await Issue.find().sort({ createdAt: -1 });
@@ -141,14 +136,16 @@ app.get("/api/issues", async (req, res) => {
   }
 });
 
-// PUBLIC: POST new issue WITH Image Upload
 app.post("/api/issues", upload.single("image"), async (req, res) => {
   try {
     const { title, description, category, latitude, longitude } = req.body;
 
     let imageUrl = "";
     if (req.file) {
-      imageUrl = `http://localhost:${PORT}/uploads/${req.file.filename}`;
+      // Dynamic Host Domain (Works locally and on Render)
+      const protocol = req.protocol;
+      const host = req.get("host");
+      imageUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
     }
 
     const newIssue = new Issue({
@@ -171,7 +168,6 @@ app.post("/api/issues", upload.single("image"), async (req, res) => {
   }
 });
 
-// PUBLIC: Admin Login
 app.post("/api/admin/login", async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -193,11 +189,13 @@ app.post("/api/admin/login", async (req, res) => {
     );
     res.json({ token, username: admin.username });
   } catch (err) {
-    res.status(500).json({ error: "Login failed server error" });
+    console.error("Login Error:", err);
+    res
+      .status(500)
+      .json({ error: "Login failed server error", details: err.message });
   }
 });
 
-// PROTECTED ROUTE: PATCH update status (Admin ONLY)
 app.patch("/api/issues/:id", verifyAdminToken, async (req, res) => {
   try {
     const { status } = req.body;
@@ -213,5 +211,5 @@ app.patch("/api/issues/:id", verifyAdminToken, async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
