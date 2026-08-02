@@ -1,6 +1,18 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+
+app.use(
+  cors({
+    origin: [
+      "https://civic-pulse-gis.vercel.app",
+      "https://civic-pulse-gis-1.onrender.com",
+      "http://localhost:5173",
+      "http://localhost:3000",
+    ],
+    credentials: true,
+  }),
+);
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
