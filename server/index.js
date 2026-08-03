@@ -1,32 +1,43 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-// Allow all origins
-app.use(cors());
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 
-// 1. CREATE THE APP FIRST
+// 1. INITIALIZE APP FIRST
 const app = express();
 
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || "civic_pulse_secret_key_123";
 
-// 2. NOW USE MIDDLEWARE ON APP
+// 2. NOW APPLY CORS & MIDDLEWARE TO APP
+const allowedOrigins = [
+  "https://civic-pulse-gis.vercel.app",
+  "https://civic-pulse-gis-1.onrender.com",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
 app.use(
   cors({
-    origin: [
-      "https://civic-pulse-gis.vercel.app",
-      "https://civic-pulse-gis-1.onrender.com",
-      "http://localhost:5173",
-      "http://localhost:3000",
-    ],
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps, Postman, or server-to-server)
+      if (!origin) return callback(null, true);
+
+      // Allow listed origins OR any Vercel preview deployment URL (*.vercel.app)
+      if (allowedOrigins.includes(origin) || origin.endsWith(".vercel.app")) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   }),
 );
+
 app.use(express.json());
 
 // Ensure uploads folder exists
@@ -50,7 +61,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// MongoDB Connection (Fallback to local only if MONGO_URI is missing)
+// MongoDB Connection
 const MONGO_URI =
   process.env.MONGO_URI || "mongodb://127.0.0.1:27017/civic_reporting";
 
@@ -144,7 +155,6 @@ app.post("/api/issues", upload.single("image"), async (req, res) => {
 
     let imageUrl = "";
     if (req.file) {
-      // Dynamic Host Domain (Works locally and on Render)
       const protocol = req.protocol;
       const host = req.get("host");
       imageUrl = `${protocol}://${host}/uploads/${req.file.filename}`;
